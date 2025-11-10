@@ -1,0 +1,24 @@
+<TodoLayout>:
+    orientation: "vertical"
+    spacing: "12dp"
+    padding: "12dp"
+
+    MDBoxLayout:
+        adaptive_height: True
+        spacing: "8dp"
+
+        MDTextField:
+            id: task_input
+            hint_text: "Enter a new task"
+            mode: "rectangle"
+            size_hint_x: 0.85
+
+        MDIconButton:
+            icon: "plus"
+            theme_icon_color: "Custom"
+            icon_color: app.theme_cls.primary_color
+            on_release: root.add_task()
+
+    ScrollView:
+        MDList:
+            id: task_list
