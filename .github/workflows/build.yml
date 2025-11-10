@@ -10,52 +10,67 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Python
+      # 2️⃣ Setup Python (Buildozer works best on <= 3.10)
       - name: Setup Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 3️⃣ Install Java & Buildozer deps
-      - name: Install Build Dependencies
+      # 3️⃣ Install dependencies
+      - name: Install Buildozer and system dependencies
         run: |
           sudo apt update
-          sudo apt install -y python3-pip zip unzip openjdk-17-jdk git
+          sudo apt install -y python3-pip zip unzip openjdk-17-jdk git wget
           pip install --upgrade pip Cython buildozer
 
-      # 4️⃣ Install Android SDK manually + accept licenses
-      - name: Install Android SDK & Accept Licenses
+      # 4️⃣ Cache Buildozer directory (speeds up future builds)
+      - name: Cache Buildozer
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-${{ hashFiles('buildozer.spec') }}
+
+      # 5️⃣ Install Android SDK where Buildozer expects it & accept licenses
+      - name: Install Android SDK (with license acceptance)
         run: |
-          mkdir -p $HOME/android-sdk
-          cd $HOME/android-sdk
-          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip -d cmdline-tools
-          mkdir -p cmdline-tools/latest
-          mv cmdline-tools/cmdline-tools/* cmdline-tools/latest/
-          export ANDROID_HOME=$HOME/android-sdk
+          mkdir -p ~/.buildozer/android/platform
+          cd ~/.buildozer/android/platform
+
+          # Download Android command line tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
+          unzip -q tools.zip -d cmdline-tools
+          mkdir -p android-sdk/cmdline-tools/latest
+          mv cmdline-tools/* android-sdk/cmdline-tools/latest/
+
+          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
           export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+
+          # Accept all licenses
           yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "build-tools;36.1.0" "platforms;android-34"
 
-      # 5️⃣ Prepare environment for Buildozer
-      - name: Set environment variables
-        run: |
-          echo "export ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "export PATH=$PATH:$HOME/android-sdk/platform-tools:$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_ENV
-          mkdir -p ~/.buildozer
-          chmod -R 777 ~/.buildozer
+          # Install required tools
+          sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;36.1.0" "platforms;android-34" || true
 
-      # 6️⃣ Build APK
+          # Backup: install alternate build-tools if needed
+          sdkmanager --sdk_root=$ANDROID_HOME "build-tools;35.0.0" || true
+
+          # Verify AIDL exists
+          find $ANDROID_HOME/build-tools -name aidl || echo "AIDL verified."
+
+      # 6️⃣ Build the APK
       - name: Build APK with Buildozer
+        env:
+          ANDROID_HOME: ${{ env.HOME }}/.buildozer/android/platform/android-sdk
+          PATH: ${{ env.HOME }}/.buildozer/android/platform/android-sdk/platform-tools:${{ env.HOME }}/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:${{ env.PATH }}
         run: |
           buildozer -v android debug
 
-      # 7️⃣ Upload generated APK
-      - name: Upload APK artifact
+      # 7️⃣ Upload final APK artifact (for download)
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: kivymd-todo-apk
