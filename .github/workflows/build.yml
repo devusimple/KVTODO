@@ -60,13 +60,14 @@ jobs:
 
           # Verify AIDL exists
           find $ANDROID_HOME/build-tools -name aidl || echo "AIDL verified."
-
-      # 6️⃣ Build the APK
+# 6️⃣ Build the APK
       - name: Build APK with Buildozer
         env:
           ANDROID_HOME: ${{ env.HOME }}/.buildozer/android/platform/android-sdk
           PATH: ${{ env.HOME }}/.buildozer/android/platform/android-sdk/platform-tools:${{ env.HOME }}/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin:${{ env.PATH }}
         run: |
+          sudo apt update
+          sudo apt install -y git  # <--- FIX for "Git not found"
           buildozer -v android debug
 
       # 7️⃣ Upload final APK artifact (for download)
